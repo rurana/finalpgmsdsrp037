@@ -1,0 +1,119 @@
+000100 IDENTIFICATION DIVISION.                                         00010000
+000200 PROGRAM-ID. P37AP05.                                             00020000
+000300 DATA DIVISION.                                                   00030000
+000400 WORKING-STORAGE SECTION.                                         00040000
+000500 01  WS-CA.                                                       00050000
+000600     03 CA-SEND         PIC X(01).                                00060000
+000700     03 CA-USER-CARDNO  PIC 9(16).                                00070000
+000800     03 CA-USER-PIN     PIC 9(04).                                00080000
+000900     03 CA-USER-ACCTYPE PIC X(07).                                00090000
+001000     03 CA-USER-TRNTYPE PIC X(01).                                00100000
+001100     03 CA-USER-CHOICE  PIC X(01) VALUE SPACES.                   00110000
+001200 01  WS-MESSAGE         PIC X(30) VALUE                           00120000
+001300     'END OF PROGRAM, BYE,BYE!!'.                                 00130000
+001400 01  WS-CHOICE          PIC 9(01) VALUE ZERO.                     00140000
+001500     COPY P37AS01.                                                00150000
+001600     COPY DFHAID.                                                 00160000
+001700 LINKAGE SECTION.                                                 00170000
+001800 01  DFHCOMMAREA   PIC X(36).                                     00180000
+001900 PROCEDURE DIVISION.                                              00190000
+002000 MAIN-PARA.                                                       00200000
+002100      IF EIBCALEN = ZERO                                          00210000
+002200         PERFORM ERROR-PARA                                       00220000
+002300      ELSE                                                        00230000
+002400         IF CA-SEND = '2'                                         00240000
+002500            MOVE LOW-VALUES TO BMSMENO                            00250000
+002600            MOVE -1 TO CHOICEI                                    00260000
+002700            PERFORM SEND-PARA                                     00270000
+002800         ELSE                                                     00280000
+002900            MOVE DFHCOMMAREA TO WS-CA                             00290000
+003000            PERFORM RECEIVE-MAP                                   00300000
+003100            PERFORM RESPONSE-PARA                                 00310000
+003200         END-IF                                                   00320000
+003300      END-IF.                                                     00330000
+003400 END-PARA.                                                        00340000
+003500      EXEC CICS RETURN                                            00350000
+003600          TRANSID('P37E')                                         00360000
+003700          COMMAREA(WS-CA)                                         00370000
+003800      END-EXEC.                                                   00380000
+003900 SEND-PARA.                                                       00390000
+004000      EXEC CICS SEND                                              00400000
+004100          MAP('BMSMEN')                                           00410000
+004200          MAPSET('P37AS01')                                       00420000
+004300          FROM(BMSMENO)                                           00430000
+004400          CURSOR                                                  00440000
+004500          ERASE                                                   00450000
+004600      END-EXEC.                                                   00460000
+004700 RESPONSE-PARA.                                                   00470000
+004800      EVALUATE EIBAID                                             00480000
+004900      WHEN DFHPF3                                                 00490000
+005000          MOVE SPACES TO CA-USER-CHOICE                           00500000
+005100          EXEC CICS XCTL                                          00510000
+005200              PROGRAM('P37AP04')                                  00520000
+005300              COMMAREA(WS-CA)                                     00530000
+005400          END-EXEC                                                00540000
+005500      WHEN DFHPF5                                                 00550000
+005600          EXEC CICS XCTL                                          00560000
+005700              PROGRAM('P37AP01')                                  00570000
+005800          END-EXEC                                                00580000
+005900      WHEN DFHENTER                                               00590000
+006000          PERFORM RECEIVE-MAP                                     00600000
+006100          PERFORM GET-PARA                                        00610000
+006200      WHEN OTHER                                                  00620000
+006300          MOVE 'INVALID KEY PRESSED' TO MSGMO                     00630000
+006400      END-EVALUATE.                                               00640000
+006500 RECEIVE-MAP.                                                     00650000
+006600      EXEC CICS RECEIVE                                           00660000
+006700          MAP('BMSMEN')                                           00670000
+006800          MAPSET('P37AS01')                                       00680000
+006900          INTO(BMSMENO)                                           00690000
+007000      END-EXEC.                                                   00700000
+007100 GET-PARA.                                                        00710000
+007200      MOVE CHOICEI TO CA-USER-CHOICE                              00720000
+007300      MOVE CHOICEI TO WS-CHOICE                                   00730000
+007400      IF CHOICEL = ZERO OR CHOICEI = SPACES                       00740000
+007500         MOVE 'PLEASE ENTER A VALID CHOICE' TO MSGMO              00750000
+007600         MOVE -1 TO CHOICEI                                       00760000
+007700         PERFORM SEND-PARA                                        00770000
+007800      ELSE                                                        00780000
+007900*        IF CHOICEL > 2                                           00790000
+008000*           MOVE 'PLEASE ENTER A VALID CHOICE' TO MSGMO           00800000
+008100*        ELSE                                                     00810000
+008200            EVALUATE WS-CHOICE                                    00820000
+008300            WHEN 1                                                00830000
+008400               MOVE 'W' TO CA-USER-TRNTYPE                        00840000
+008500               MOVE '1' TO CA-SEND                                00850000
+008600               EXEC CICS XCTL                                     00860000
+008700                   PROGRAM('P37AP06')                             00870000
+008800                   COMMAREA(WS-CA)                                00880000
+008900               END-EXEC                                           00890000
+009000            WHEN 2                                                00900000
+009100               MOVE 'D' TO CA-USER-TRNTYPE                        00910000
+009200               MOVE '1' TO CA-SEND                                00920000
+009300               EXEC CICS XCTL                                     00930000
+009400                   PROGRAM('P37AP06')                             00940000
+009500                   COMMAREA(WS-CA)                                00950000
+009600               END-EXEC                                           00960000
+009700            WHEN 3                                                00970000
+009800               MOVE '3' TO CA-SEND                                00980000
+009900               EXEC CICS XCTL                                     00990000
+010000                   PROGRAM('P37AP08')                             01000000
+010100                   COMMAREA(WS-CA)                                01010000
+010200               END-EXEC                                           01020000
+010300            WHEN 4                                                01030000
+010400               MOVE '4' TO CA-SEND                                01040000
+010500               EXEC CICS XCTL                                     01050000
+010600                   PROGRAM('P37AP09')                             01060000
+010700                   COMMAREA(WS-CA)                                01070000
+010800               END-EXEC                                           01080000
+010900            WHEN OTHER                                            01090000
+011000               MOVE 'INVALID CHOICE' TO MSGMO                     01100000
+011100               MOVE -1 TO CHOICEI                                 01110000
+011200               PERFORM SEND-PARA                                  01120000
+011300            END-EVALUATE                                          01130000
+011400*        END-IF                                                   01140000
+011500      END-IF.                                                     01150000
+011600 ERROR-PARA.                                                      01160000
+011700      EXEC CICS XCTL                                              01170000
+011800          PROGRAM('P37AP01')                                      01180000
+011900      END-EXEC.                                                   01190000

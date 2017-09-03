@@ -1,0 +1,117 @@
+000100 IDENTIFICATION DIVISION.                                         00010002
+000200 PROGRAM-ID. P37AP06.                                             00020000
+000300 DATA DIVISION.                                                   00030000
+000400 WORKING-STORAGE SECTION.                                         00040000
+000500 01  WS-CA.                                                       00050000
+000600     03 CA-CARDNO  PIC 9(16) VALUE ZERO.                          00060000
+000700     03 CA-PIN     PIC 9(04) VALUE ZERO.                          00070000
+000800     03 CA-ACCTYPE PIC X(07) VALUE SPACES.                        00080000
+000900     03 CA-TRNTYPE PIC X(08) VALUE SPACES.                        00090000
+001000 01  WS-MESSAGE    PIC X(30) VALUE                                00100000
+001100     'END OF PROGRAM, BYE,BYE!!'.                                 00110000
+001200 01  WS-AMOUNT     PIC 9(05) VALUE ZERO.                          00120000
+001300 01  WS-ACCTYPE    PIC X(07) VALUE SPACES.                        00130000
+001400 01  WS-CARDNO     PIC 9(16) VALUE ZERO.                          00140000
+001500 01  WS-RESP-CODE  PIC X(08) VALUE SPACES.                        00150000
+001600 LINKAGE SECTION                                                  00160000
+001700 01  DFHCOMMAREA   PIC X(36).                                     00170000
+001800 PROCEDURE DIVISION.                                              00180000
+001900 MAIN-PARA.                                                       00190000
+002000      IF EIBCALEN = ZERO                                          00200000
+002100         PERFORM ERROR-PARA                                       00210000
+002200      ELSE                                                        00220000
+002300         IF EIBCALEN = 36                                         00230000
+002400            MOVE LOW-VALUES TO BMSMENO                            00240000
+002500            PERFORM SEND-PARA                                     00250000
+002600         ELSE                                                     00260000
+002700            MOVE DFHCOMMAREA TO WS-CA                             00270000
+002800            PERFORM RESPONSE-PARA                                 00280000
+002900         END-IF                                                   00290000
+003000         PERFORM END-PARA                                         00300000
+003100      END-IF.                                                     00310000
+003200 END-PARA.                                                        00320000
+003300      EXEC CICS RETURN                                            00330000
+003400          TRANSID(P37F)                                           00340000
+003500          COMMAREA(WS-CA)                                         00350000
+003600      END-EXEC.                                                   00360000
+003700 SEND-PARA.                                                       00370000
+003800      EXEC CICS SEND                                              00380000
+003900          MAP('BMSAMT')                                           00390000
+004000          MAPSET('P37AS01')                                       00400000
+004100          FROM(BMSAMTO)                                           00410000
+004200          ERASE                                                   00420000
+004300      END-EXEC.                                                   00430000
+004400 RESPONSE-PARA.                                                   00440000
+004500      EVALUATE EIBAID                                             00450000
+004600      WHEN DFHPF3                                                 00460000
+004700          EXEC CICS XCTL                                          00470000
+004800              PROGRAM('P37AP05')                                  00480000
+004900          END-EXEC                                                00490000
+005000      WHEN DFHPF5                                                 00500000
+005100          EXEC CICS XCTL                                          00510000
+005200              PROGRAM('P37AP01')                                  00520000
+005300          END-EXEC                                                00530000
+005400      WHEN DFHENTER                                               00540000
+005500          PERFORM RECEIVE-MAP                                     00550000
+005600          PERFORM GET-PARA                                        00560000
+005700      WHEN OTHER                                                  00570000
+005800          MOVE 'INVALID KEY PRESSED' TO MSGO                      00580000
+005900      END-EVALUATE.                                               00590000
+006000 RECEIVE-MAP.                                                     00600000
+006100      EXEC CICS RECEIVE                                           00610000
+006200          MAP('BMSAMT')                                           00620000
+006300          MAPSET('P37AS01')                                       00630000
+006400          INTO(BMSAMTO)                                           00640000
+006500      END-EXEC.                                                   00650000
+006600 GET-PARA.                                                        00660000
+006700      MOVE AMTI TO WS-AMOUNT                                      00670000
+006800      IF AMTL = ZERO OR AMTI = SPACES                             00680000
+006900         MOVE 'PLEASE A VALID AMOUNT' TO MSGO                     00690000
+007000      ELSE                                                        00700000
+007100         IF AMOUNTL > 5                                           00710000
+007200            MOVE 'PLEASE ENTER A VALID AMOUNT' TO MSGO            00720000
+007300         ELSE                                                     00730000
+007400            IF WS-AMOUNT > 40000 OR WS-AMOUNT < 100               00740000
+007500               MOVE 'ENTER A AMOUNT < 40000 AND > 100' TO MSGO    00750000
+007600            ELSE                                                  00760000
+007700               PERFORM READ-USER                                  00770000
+007800            END-IF                                                00780000
+007900         END-IF                                                   00790000
+008000      END-IF.                                                     00800000
+008100 READ-USER.                                                       00810000
+008200      EXEC CICS READ                                              00820000
+008300          FILE('P37AFILE')                                        00830001
+008400          RIDFLD(WS-CARDNO)                                       00840000
+008500          INTO(USER-RECORD)                                       00850000
+008600          RESP(WS-RESP-CODE)                                      00860000
+008700      END-EXEC                                                    00870000
+008800      EVALUATE WS-RESP-CODE                                       00880000
+008900      WHEN DFHRESP(NORMAL)                                        00890000
+009000          PERFORM MOVE-PARA                                       00900000
+009100          PERFORM CHECK-ACCTYPE                                   00910000
+009200      WHEN DFHRESP(NOTFND)                                        00920000
+009300          MOVE 'RECORD NOT FOUND' TO MSGO                         00930000
+009400      WHEN OTHER                                                  00940000
+009500          MOVE 'ERROR ACCESSING FILE' TO SGO                      00950000
+009600      END-EVALUATE.                                               00960000
+009700 MOVE-PARA.                                                       00970000
+009800      MOVE USER-BAL TO WS-BAL                                     00980000
+009900 CHECK-ACCTYPE.                                                   00990000
+010000      IF WS-ACCTYPE = 'SAVINGS' OR WS-ACCTYPE = 'CURRENT'         01000000
+010100         PERFORM CHECK-TRNTYPE                                    01010000
+010200      END-IF.                                                     01020000
+010300 CHECK-TRNTYPE.                                                   01030000
+010400      EVALUATE WS-TRNTYPE                                         01040000
+010500      WHEN 'WITHDRAW'                                             01050000
+010600         PERFORM SUB-PARA                                         01060000
+010700      WHEN 'DEPOSIT'                                              01070000
+010800         PERFORM ADD-PARA                                         01080000
+010900      WHEN OTHER                                                  01090000
+011000         MOVE 'ERROR HAS BEEN OCCURED' TO MSGO                    01100000
+011100      END-EVALUATE.                                               01110000
+011200 SUB-PARA.                                                        01120000
+011300      COMPUTE WS-BAL = WS-BAL - WS-AMOUNT                         01130000
+011400      MOVE WS-BAL TO USER-BAL.                                    01140000
+011500 ADD-PARA.                                                        01150000
+011600      COMPUTE WS-BAL = WS-BAL + WS-AMOUNT                         01160000
+011700      MOVE WS-BAL TO USER-BAL.                                    01170000

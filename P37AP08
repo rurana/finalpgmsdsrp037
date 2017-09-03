@@ -1,0 +1,95 @@
+000100 IDENTIFICATION DIVISION.                                         00010001
+000200 PROGRAM-ID. P37AP08.                                             00020001
+000300 DATA DIVISION.                                                   00030001
+000400 WORKING-STORAGE SECTION.                                         00040001
+000500 01  WS-CA.                                                       00050001
+000600     03 CA-SEND         PIC X(01).                                00060002
+000700     03 CA-USER-CARDNO  PIC 9(16).                                00070002
+000800     03 CA-USER-PIN     PIC 9(04).                                00080002
+000900     03 CA-USER-ACCTYPE PIC X(07).                                00090002
+001000     03 CA-USER-TRNTYPE PIC X(08).                                00100002
+001100 01  WS-MESSAGE         PIC X(30) VALUE                           00110002
+001200     'END OF PROGRAM, BYE,BYE!!'.                                 00120001
+001300 01  WS-CARDNO          PIC 9(16) VALUE ZERO.                     00130002
+001400 01  WS-RESP-CODE       PIC X(08) VALUE SPACES.                   00140002
+001500 01  WS-DATE.                                                     00150004
+001600     03 WS-DATE-YY      PIC 9(02)                                 00160004
+001700     03 WS-DATE-MM      PIC 9(02)                                 00170004
+001800     03 WS-DATE-DD      PIC 9(02)                                 00180004
+001900 LINKAGE SECTION                                                  00190001
+002000 01  DFHCOMMAREA        PIC X(36).                                00200002
+002100 PROCEDURE DIVISION.                                              00210001
+002200 MAIN-PARA.                                                       00220001
+002300      MOVE DFHCOMMAREA TO WS-CA                                   00230002
+002400         IF CA-SEND = '3'                                         00240002
+002500            MOVE LOW-VALUES TO BMSMENO                            00250001
+002600            PERFORM READ-USER-TABLE                               00260002
+002700            PERFORM RESPONSE-PARA                                 00270002
+002800         ELSE                                                     00280001
+002900            PERFORM ERROR-PARA                                    00290002
+003000         END-IF.                                                  00300002
+003100 READ-USER-TABLE.                                                 00310002
+003200      EXEC SQL                                                    00320002
+003300          SELECT * FROM T37_USER_TABLE                            00330002
+003400          INTO :CARD-NO, :NAME, :BALANCE, :ACC-TYPE, :ACC-NO      00340002
+003500          WHERE CARD_NO = :CS-USER-CARDNO                         00350002
+003600      END-EXEC                                                    00360002
+003700      EVALUATE WS-RESP-CODE                                       00370002
+003800      WHEN DFHRESP(NORMAL)                                        00380002
+003900          PERFORM MOVE-PARA                                       00390002
+004000      WHEN DFHRESP(NOTFND)                                        00400002
+004100          MOVE 'RECORDS NOT FOUND' TO MSGO                        00410002
+004200      WHEN OTHER                                                  00420002
+004300          MOVE 'ERROR ACCESSING FILE' TO MSGO                     00430002
+004400      END-EVALUATE                                                00440002
+004500          PERFORM SEND-PARA.                                      00450002
+004600 MOVE-PARA.                                                       00460002
+004700      MOVE CARD-NO  TO BCARDNO                                    00470002
+004800      MOVE NAME     TO BNAME                                      00480002
+004900      MOVE BALANCE  TO BBAL                                       00490002
+005000      MOVE ACC-TYPE TO BTYPE                                      00500002
+005100      MOVE ACC-NO   TO BACCNO                                     00510002
+005200      MOVE CARD-NO  TO BCARDNO                                    00520002
+005300      PERFORM DATE-PARA.                                          00530002
+005400 DATE-PARA.                                                       00540002
+005500      EXEC CICS ASKTIME                                           00550004
+005600         ABSTIME(WS-DATE)                                         00560004
+005700      END-EXEC                                                    00570004
+005800      EXEC CICS FORMATTIME                                        00580004
+005900          ABSTIME(WS-DATE)                                        00590004
+006000          DDMMYYYY(BDATE)                                         00600004
+006100          DATESEP                                                 00610004
+006200       END-EXEC.                                                  00620004
+006300 RESPONSE-PARA.                                                   00630002
+006400      PERFORM RECEIVE-MAP                                         00640002
+006500      EVALUATE EIBAID                                             00650002
+006600      WHEN DFHENTER                                               00660002
+006700          EXEC CICS XCTL                                          00670002
+006800              PROGRAM('P37AP05')                                  00680002
+006900              COMMAREA(WS-CA)                                     00690002
+007000          END-EXEC                                                00700002
+007100      WHEN DFHPF1                                                 00710002
+007200          EXEC CICS XCTL                                          00720002
+007300              PROGRAM('P37AP01')                                  00730002
+007400          END-EXEC                                                00740002
+007500      WHEN OTHER                                                  00750002
+007600          MOVE 'INVALID KEY PRESSED' TO MSGO                      00760002
+007700          PERFORM SEND-PARA                                       00770002
+007800      END-EVALUATE.                                               00780002
+007900 SEND-PARA.                                                       00790001
+008000      EXEC CICS SEND                                              00800001
+008100          MAP('BMSBENQ')                                          00810001
+008200          MAPSET('P37AS01')                                       00820001
+008300          FROM(BMSBENQO)                                          00830001
+008400          ERASE                                                   00840001
+008500      END-EXEC.                                                   00850002
+008600 RECEIVE-PARA.                                                    00860002
+008700      EXEC CICS RECEIVE                                           00870002
+008800          MAP('BMSBENQ')                                          00880002
+008900          MAPSET('P37AS01')                                       00890002
+009000          FROM(BMSBENQ1)                                          00900002
+009100      END-EXEC.                                                   00910003
+009200 ERROR-PARA.                                                      00920003
+009300      EXEC CICS XCTL                                              00930003
+009400          PROGRAM('P37AP01')                                      00940003
+009500      END-EXEC.                                                   00950003
